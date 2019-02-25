@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Copyright 2014-2017, Red Hat, Inc. and/or its affiliates, and individual
+    contributors by the @authors tag. 
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!-- Configures the Camel Context-->
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+    xsi:schemaLocation="http://www.springframework.org/schema/beans
+    					http://www.springframework.org/schema/beans/spring-beans.xsd
+						http://camel.apache.org/schema/spring
+						http://camel.apache.org/schema/spring/camel-spring.xsd">
+						
+	<bean id="properties" class="org.apache.camel.component.properties.PropertiesComponent">
+		<property name="location" value="config.properties" />
+	</bean>
+	
+    <bean class="com.fileProcessing.processors.loggerProcessor" id="loggerProcessor"/>
+    <bean class="com.fileProcessing.processors.loggerProcessorJson" id="loggerProcessorJson"/>
+    
+    <camelContext id="_camelContext1" xmlns="http://camel.apache.org/schema/spring">
+        <route id="fileProcess">
+        	<from id="fromIncoming" uri="file:{{xmlincoming}}" />
+        	<setHeader headerName="country">
+        		<xpath>
+        			/order/country/text()
+       			</xpath>
+        	</setHeader>
+        	<setHeader headerName="orderId">
+        		<xpath>
+        			/order/id/text()
+       			</xpath>
+        	</setHeader>
+        	<setHeader headerName="provider">
+        		<xpath>
+        			/order/@provider
+       			</xpath>
+        	</setHeader>
+        	<setHeader headerName="fileName">
+        		<simple>
+        			order_${header.orderId}.xml
+       			</simple>
+        	</setHeader>
+        	<process id="callingProcess_1" ref="loggerProcessor" />
+        	<doTry>
+	        	<choice>
+	        		<when>
+	        			<simple>
+	        				${header.country} == 'CO'
+	        			</simple>
+        				<toD id="toOutgoingColombia" uri="file:{{xmloutgoing}}/Colombia/${header.provider}?fileName=${header.fileName}&amp;fileExist=Fail" />
+	        		</when>
+	        		<otherwise>
+	       				<toD id="toOutgoingOther" uri="file:{{xmloutgoing}}/Others/${header.provider}?fileName=${header.fileName}&amp;fileExist=Fail" />
+	        		</otherwise>
+	        	</choice>
+	        	<doCatch>
+ 					<exception>java.lang.Exception</exception>
+ 					<toD id="toOutgoingError" uri="file:{{xmloutgoing}}/Errors?fileName=${header.fileName}&amp;fileExist=Append" />
+				</doCatch>
+        	</doTry>
+        </route>
+        <route id="fileProcessJson">
+        	<from id="fromIncoming_json" uri="file:{{jsonincoming}}" />
+        	<setHeader headerName="countryJson">
+        		<jsonpath>
+        			$.country
+       			</jsonpath>
+        	</setHeader>
+        	<setHeader headerName="orderIdJson">
+        		<jsonpath>
+        			$.id
+       			</jsonpath>
+        	</setHeader>
+        	<setHeader headerName="providerJson">
+        		<jsonpath>
+        			$.order.provider
+       			</jsonpath>
+        	</setHeader>
+        	<setHeader headerName="fileNameJson">
+        		<simple>
+        			order_${header.orderIdJson}.json
+       			</simple>
+        	</setHeader>
+        	<process id="callingProcess_2" ref="loggerProcessorJson" />
+        	<doTry>
+	        	<choice>
+	        		<when>
+	        			<simple>
+	        				${header.countryJson} == 'CO'
+	        			</simple>
+        				<toD id="toOutgoingColombia_json" uri="file:{{jsonoutgoing}}/Colombia/${header.providerJson}?fileName=${header.fileNameJson}&amp;fileExist=Fail" />
+	        		</when>
+	        		<otherwise>
+	       				<toD id="toOutgoingOther_json" uri="file:{{jsonoutgoing}}/Others/${header.providerJson}?fileName=${header.fileNameJson}&amp;fileExist=Fail" />
+	        		</otherwise>
+	        	</choice>
+	        	<doCatch>
+ 					<exception>java.lang.Exception</exception>
+ 					<toD id="toOutgoingError_json" uri="file:{{jsonoutgoing}}/Errors?fileName=${header.fileNameJson}&amp;fileExist=Append" />
+				</doCatch>
+        	</doTry>
+        </route>
+    </camelContext>
+</beans>
